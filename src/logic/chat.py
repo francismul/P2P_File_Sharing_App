@@ -1,7 +1,9 @@
+import uuid
+
 import socket
 import threading
-
 from decouple import config
+
 
 port = config("CHAT_PORT", default=5002, cast=int)
 
@@ -27,8 +29,24 @@ class ChatManager:
         sock.sendto(message.encode(), ("<broadcast>", self.port))
         sock.close()
 
+    def send_transfer_request(self, target_ip, filename, file_size, is_folder=False):
+        request_id = str(uuid.uuid4())
+        message = f"TRANSFER_REQUEST:{self.username}:{request_id}:{filename}:{file_size}:{is_folder}"
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.sendto(message.encode(), (target_ip, self.port))
+        sock.close()
+        return request_id
+
+    def send_transfer_response(self, target_ip, request_id, response):
+        message = f"TRANSFER_RESPONSE:{self.username}:{request_id}:{response}"
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.sendto(message.encode(), (target_ip, self.port))
+        sock.close()
+
     def _listen(self):
+        # Import moved here to avoid circular import
         from src.controller import chat_signal
+        from src.controller import transfer_request_signal
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("", self.port))
@@ -39,6 +57,15 @@ class ChatManager:
                 if decoded.startswith("CHAT:"):
                     _, sender, message = decoded.split(":", 2)
                     chat_signal.message_received.emit(sender, message)
+                elif decoded.startswith("TRANSFER_REQUEST:"):
+                    _, sender, request_id, filename, file_size, is_folder = decoded.split(
+                        ":", 5)
+                    transfer_request_signal.transfer_request_received.emit(
+                        addr[0], filename, file_size, request_id)
+                elif decoded.startswith("TRANSFER_RESPONSE:"):
+                    _, sender, request_id, response = decoded.split(":", 3)
+                    transfer_request_signal.transfer_response_received.emit(
+                        request_id, response)
             except Exception:
                 pass
 

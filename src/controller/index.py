@@ -15,7 +15,7 @@ logger = logging.getLogger("ShareSync")
 
 
 class AppLogic:
-    def __init__(self, chat_display=None, username=None):
+    def __init__(self, chat_display=None, username=None, start_web_server=True):
         # Lazy import to avoid circular dependency
         from src.logic import NetworkManager
         from src.logic import ChatManager
@@ -31,7 +31,18 @@ class AppLogic:
         self.pending_transfers = {}
         transfer_request_signal.transfer_response_received.connect(
             self.handle_transfer_response)
-        logger.info("Network and Chat managers started")
+
+        # Set peer update callback
+        self.network_manager.peer_update_callback = self._on_peers_updated
+
+        # Start web server
+        self.web_server = None
+        if start_web_server:
+            from src.web_server import WebServer
+            self.web_server = WebServer(self)
+            self.web_server.start()
+
+        logger.info("Network, Chat, and Web managers started")
 
     def get_peers(self):
         peers = self.network_manager.get_peers()
@@ -148,6 +159,12 @@ class AppLogic:
         else:
             logger.warning(
                 f"Received response for unknown request ID: {request_id}")
+
+    def _on_peers_updated(self):
+        """Called when peers are discovered or lost"""
+        if self.web_server:
+            self.web_server.broadcast_peers_update()
+        peer_signal.peers_changed.emit()
 
     def start_file_transfer(self, peer_ip, file_path):
         """Start sending a file to a peer"""

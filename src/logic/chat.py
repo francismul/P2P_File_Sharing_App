@@ -49,7 +49,7 @@ class ChatManager:
         from src.controller import transfer_request_signal
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(("", self.port))
+        sock.bind((self._get_local_ip(), self.port))
         while self.running:
             try:
                 data, addr = sock.recvfrom(4096)

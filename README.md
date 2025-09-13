@@ -66,8 +66,8 @@ peers on the local network, share files, and chat in real time.
 
 - `main.py` - Entry point for the application
 - `gui/` - Modular GUI components
-- `src/network/` - Network and peer logic
-- `src/logic/` - Application logic and controller
+- `src/logic/` - Network and peer logic
+- `src/controller/` - Application logic and controller
 
 ## License
 

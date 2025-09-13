@@ -3,9 +3,6 @@ import threading
 
 from decouple import config
 
-from src.controller import chat_signal
-
-
 port = config("CHAT_PORT", default=5002, cast=int)
 
 
@@ -31,6 +28,7 @@ class ChatManager:
         sock.close()
 
     def _listen(self):
+        from src.controller import chat_signal
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("", self.port))

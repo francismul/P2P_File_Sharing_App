@@ -6,12 +6,8 @@ import struct
 from decouple import config
 from concurrent.futures import ThreadPoolExecutor
 
-
-from src.controller import bandwidth_signal
-
-
 port = config("P2P_PORT", default=5001, cast=int)
-broadcast_port = config("P2P_BROADCAST_PORT", default=5003, cast=int)
+broadcast_port = config("P2P_BROADCAST_PORT", default=5002, cast=int)
 
 
 class NetworkManager:
@@ -22,6 +18,7 @@ class NetworkManager:
         self.running = False
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self._udp_sock = None  # Store UDP socket for cleanup
+        self._server_sock = None  # Store TCP server socket for cleanup
         self._download_bytes = 0
         self._upload_bytes = 0
         self._last_bandwidth_emit = time.time()
@@ -43,6 +40,13 @@ class NetworkManager:
             except Exception:
                 pass
             self._udp_sock = None
+        # Cleanup TCP server socket
+        if self._server_sock:
+            try:
+                self._server_sock.close()
+            except Exception:
+                pass
+            self._server_sock = None
 
     # -------------------- Peer Discovery --------------------
     def _discover_peers(self):
@@ -82,6 +86,7 @@ class NetworkManager:
         server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_sock.bind(("", self.port))
         server_sock.listen(20)
+        self._server_sock = server_sock  # Store for cleanup
 
         while self.running:
             try:
@@ -170,6 +175,8 @@ class NetworkManager:
         self.peers.discard(peer_ip)
 
     def _bandwidth_monitor(self):
+        # Lazy import to avoid circular dependency
+        from src.controller import bandwidth_signal
         while True:
             time.sleep(self._bandwidth_interval)
             now = time.time()

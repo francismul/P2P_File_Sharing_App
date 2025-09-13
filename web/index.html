@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="assets/css/styles.css" />
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <title>P2P File Share</title>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🔗 P2P File Share</h1>
+        <p>Share files directly between devices using WebRTC</p>
+      </div>
+
+      <div class="card">
+        <div class="connection-section">
+          <div class="connection-card">
+            <h3>🌐 Network Status</h3>
+            <p>Your device will be automatically discovered by peers on the local network</p>
+          </div>
+
+          <div class="connection-card">
+            <h3>� Discovered Peers</h3>
+            <div class="peers-list" id="peersList">
+              <p>Connecting to P2P network...</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="status disconnected" id="connectionStatus">
+          Select a peer to start sharing files and folders
+        </div>
+      </div>
+
+      <div class="card file-section" id="fileSection" style="display: none">
+        <h2>📁 File Sharing</h2>
+        <div
+          class="file-drop-zone"
+          onclick="document.getElementById('fileInput').click()"
+          ondrop="handleDrop(event)"
+          ondragover="handleDragOver(event)"
+          ondragleave="handleDragLeave(event)"
+        >
+          <p>📤 Drop files or folders here or click to select</p>
+          <small>Files and folders will be sent directly to the selected peer</small>
+        </div>
+        <input
+          type="file"
+          id="fileInput"
+          multiple
+          webkitdirectory
+          mozdirectory
+          style="display: none"
+          onchange="handleFileSelect(event)"
+        />
+
+        <div class="file-list" id="fileList"></div>
+      </div>
+
+      <div class="card">
+        <h3>📊 Connection Log</h3>
+        <div class="logs" id="logs"></div>
+      </div>
+    </div>
+    <script src="assets/js/script.js"></script>
+  </body>
+</html>

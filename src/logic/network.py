@@ -5,6 +5,8 @@ import time
 import struct
 from decouple import config
 from concurrent.futures import ThreadPoolExecutor
+import zipfile
+import tempfile
 
 
 port = config("P2P_PORT", default=5001, cast=int)
@@ -24,6 +26,7 @@ class NetworkManager:
         self._upload_bytes = 0
         self._last_bandwidth_emit = time.time()
         self._bandwidth_interval = 1.0  # seconds
+        self.peer_update_callback = None  # Callback for peer updates
         threading.Thread(target=self._bandwidth_monitor, daemon=True).start()
 
     def start(self):
@@ -69,7 +72,10 @@ class NetworkManager:
             try:
                 data, addr = sock.recvfrom(1024)
                 if data == b"PEER_DISCOVERY" and addr[0] != self._get_local_ip():
-                    self.peers.add(addr[0])
+                    if addr[0] not in self.peers:
+                        self.peers.add(addr[0])
+                        if self.peer_update_callback:
+                            self.peer_update_callback()
             except Exception:
                 pass
         try:
@@ -101,7 +107,10 @@ class NetworkManager:
             name_len, file_size = struct.unpack("!II", header)
 
             filename = conn.recv(name_len).decode()
-            with open(filename, "wb") as f:
+
+            # Receive file
+            temp_filename = filename + '.temp'
+            with open(temp_filename, "wb") as f:
                 remaining = file_size
                 while remaining > 0:
                     chunk = conn.recv(min(65536, remaining))
@@ -110,16 +119,59 @@ class NetworkManager:
                     f.write(chunk)
                     remaining -= len(chunk)
                     self._download_bytes += len(chunk)
+
+            # Check if it's a zip file (directory)
+            if filename.endswith('.zip') and zipfile.is_zipfile(temp_filename):
+                # Extract directory
+                extract_dir = filename[:-4]  # Remove .zip extension
+                os.makedirs(extract_dir, exist_ok=True)
+                with zipfile.ZipFile(temp_filename, 'r') as zipf:
+                    zipf.extractall(extract_dir)
+                os.unlink(temp_filename)
+                print(f"[OK] Received and extracted directory: {extract_dir} from {addr}")
+            else:
+                # Regular file
+                os.rename(temp_filename, filename)
+                print(f"[OK] Received file: {filename} from {addr}")
+
         except Exception as e:
             print(f"[ERROR] Failed receiving from {addr}: {e}")
+            # Clean up temp file if it exists
+            try:
+                if 'temp_filename' in locals():
+                    os.unlink(temp_filename)
+            except:
+                pass
         finally:
             conn.close()
 
     # -------------------- Sending --------------------
-    def send_file(self, peer_ip, filename):
+    def send_file(self, peer_ip, filepath):
         try:
-            file_size = os.path.getsize(filename)
-            name_bytes = os.path.basename(filename).encode()
+            if os.path.isdir(filepath):
+                # Handle directory: create a zip file
+                dir_name = os.path.basename(filepath)
+                temp_zip = tempfile.NamedTemporaryFile(suffix='.zip', delete=False)
+                temp_zip.close()
+
+                with zipfile.ZipFile(temp_zip.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for root, dirs, files in os.walk(filepath):
+                        for file in files:
+                            file_path = os.path.join(root, file)
+                            arcname = os.path.relpath(file_path, os.path.dirname(filepath))
+                            zipf.write(file_path, arcname)
+
+                filename = temp_zip.name
+                display_name = dir_name + '.zip'
+                file_size = os.path.getsize(filename)
+                cleanup_zip = True
+            else:
+                filename = filepath
+                display_name = os.path.basename(filename)
+                file_size = os.path.getsize(filename)
+                cleanup_zip = False
+
+            name_bytes = display_name.encode()
             name_len = len(name_bytes)
 
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -137,7 +189,11 @@ class NetworkManager:
                     self._upload_bytes += len(data)
 
             sock.close()
-            print(f"[OK] Sent {filename} → {peer_ip}")
+
+            if cleanup_zip:
+                os.unlink(filename)
+
+            print(f"[OK] Sent {display_name} → {peer_ip}")
         except Exception as e:
             print(f"[ERROR] Sending to {peer_ip}: {e}")
 

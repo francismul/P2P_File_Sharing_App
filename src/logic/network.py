@@ -6,6 +6,7 @@ import struct
 from decouple import config
 from concurrent.futures import ThreadPoolExecutor
 
+
 port = config("P2P_PORT", default=5001, cast=int)
 broadcast_port = config("P2P_BROADCAST_PORT", default=5002, cast=int)
 
@@ -33,14 +34,12 @@ class NetworkManager:
     def stop(self):
         self.running = False
         self.executor.shutdown(wait=False)
-        # Cleanup UDP socket
         if self._udp_sock:
             try:
                 self._udp_sock.close()
             except Exception:
                 pass
             self._udp_sock = None
-        # Cleanup TCP server socket
         if self._server_sock:
             try:
                 self._server_sock.close()
@@ -53,7 +52,7 @@ class NetworkManager:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.bind(("", self.broadcast_port))
-        self._udp_sock = sock  # Save reference for cleanup
+        self._udp_sock = sock
 
         def broadcast():
             while self.running:
@@ -73,7 +72,6 @@ class NetworkManager:
                     self.peers.add(addr[0])
             except Exception:
                 pass
-        # Close socket when thread exits
         try:
             sock.close()
         except Exception:
@@ -86,7 +84,7 @@ class NetworkManager:
         server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_sock.bind(("", self.port))
         server_sock.listen(20)
-        self._server_sock = server_sock  # Store for cleanup
+        self._server_sock = server_sock
 
         while self.running:
             try:
@@ -97,7 +95,6 @@ class NetworkManager:
 
     def _handle_client(self, conn, addr):
         try:
-            # Receive header (filename length + file size + filename)
             header = conn.recv(8)
             if not header:
                 return
@@ -128,11 +125,9 @@ class NetworkManager:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((peer_ip, self.port))
 
-            # Send header (filename length + file size + filename)
             sock.send(struct.pack("!II", name_len, file_size))
             sock.send(name_bytes)
 
-            # Send file in chunks
             with open(filename, "rb") as f:
                 while True:
                     data = f.read(65536)
@@ -151,7 +146,6 @@ class NetworkManager:
 
     def get_lan_status(self):
         local_ip = self._get_local_ip()
-        # Consider connected if not localhost
         if local_ip and not local_ip.startswith("127."):
             return True, local_ip
         return False, local_ip
@@ -175,7 +169,6 @@ class NetworkManager:
         self.peers.discard(peer_ip)
 
     def _bandwidth_monitor(self):
-        # Lazy import to avoid circular dependency
         from src.controller import bandwidth_signal
         while True:
             time.sleep(self._bandwidth_interval)

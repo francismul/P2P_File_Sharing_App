@@ -39,7 +39,7 @@ class FileManager(QObject):
 
     def __init__(self):
         super().__init__()
-        self.transfers = {}  # {(filename, peer_ip): FileTransfer}
+        self.transfers = {}
         self.lock = threading.Lock()
 
     def add_transfer(self, filename, peer_ip, size):

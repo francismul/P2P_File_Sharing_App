@@ -20,3 +20,13 @@ class BandwidthSignal(QObject):
 
 
 bandwidth_signal = BandwidthSignal()
+
+
+class TransferRequestSignal(QObject):
+    # sender_ip, filename, file_size, request_id
+    transfer_request_received = pyqtSignal(str, str, str, str)
+    # request_id, response (accept/decline)
+    transfer_response_received = pyqtSignal(str, str)
+
+
+transfer_request_signal = TransferRequestSignal()

@@ -1,7 +1,8 @@
 from PyQt5.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton
+from PyQt5.QtCore import QTimer
 
 
-def create_header():
+def create_header(app_logic):
     header = QFrame()
     header.setFixedHeight(90)
     header.setStyleSheet("""
@@ -40,28 +41,41 @@ def create_header():
     """)
     layout.addWidget(subtitle)
     layout.addStretch()
-    status = QLabel("● Offline")
-    status.setStyleSheet("""
-        QLabel { 
-            font-size: 14px; 
-            color: #f38ba8; 
-            background: rgba(243, 139, 168, 0.1);
-            border: 1px solid rgba(243, 139, 168, 0.3);
-            border-radius: 20px;
-            padding: 8px 16px;
-            font-weight: 600;
-        }
-    """)
+    status = QLabel()
+
+    def update_status():
+        connected, local_ip = app_logic.get_lan_status()
+        if connected:
+            status.setText(f"● Online ({local_ip})")
+            status.setStyleSheet("""
+                QLabel { 
+                    font-size: 14px; 
+                    color: #a6e3a1; 
+                    background: rgba(166, 227, 161, 0.1);
+                    border: 1px solid rgba(166, 227, 161, 0.3);
+                    border-radius: 20px;
+                    padding: 8px 16px;
+                    font-weight: 600;
+                }
+            """)
+        else:
+            status.setText("● Offline")
+            status.setStyleSheet("""
+                QLabel { 
+                    font-size: 14px; 
+                    color: #f38ba8; 
+                    background: rgba(243, 139, 168, 0.1);
+                    border: 1px solid rgba(243, 139, 168, 0.3);
+                    border-radius: 20px;
+                    padding: 8px 16px;
+                    font-weight: 600;
+                }
+            """)
+    update_status()
     layout.addWidget(status)
-    connect_btn = QPushButton("Connect to Network")
-    connect_btn.setStyleSheet("""
-        QPushButton {
-            background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                      stop: 0 #a6e3a1, stop: 1 #94e2d5);
-            font-size: 14px;
-            padding: 12px 24px;
-            margin-left: 15px;
-        }
-    """)
-    layout.addWidget(connect_btn)
+    # Auto-refresh every 2 seconds
+    timer = QTimer(header)
+    timer.timeout.connect(update_status)
+    timer.start(2000)
+
     return header
